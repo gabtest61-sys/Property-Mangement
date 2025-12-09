@@ -1,7 +1,7 @@
 'use client';
 
 import { Header } from '@/components/layout';
-import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Input } from '@/components/ui';
+import { Button, Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui';
 import {
   Search,
   Home,
@@ -19,7 +19,6 @@ import {
   Video,
   Mail,
   Phone,
-  ExternalLink,
   Lightbulb,
   Shield,
   Bell,
@@ -239,7 +238,7 @@ export default function HelpPage() {
 
       <div className="p-4 md:p-6 space-y-6">
         {/* Search Bar */}
-        <Card className="bg-gradient-to-r from-blue-500 to-blue-600 border-none">
+        <Card className="bg-linear-to-r from-blue-500 to-blue-600 border-none">
           <CardContent className="py-8">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold text-white mb-2">

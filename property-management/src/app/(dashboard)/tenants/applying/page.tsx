@@ -2,29 +2,33 @@
 
 import { useState } from 'react';
 import { Header } from '@/components/layout';
-import { Button, Card, Badge, Avatar, Input, Modal } from '@/components/ui';
+import { Button, Card, Badge, Avatar, Input, Modal, Textarea } from '@/components/ui';
 import {
   Plus,
   Search,
   Filter,
   Phone,
   Mail,
-  MapPin,
   Calendar,
+  FileText,
+  CheckCircle,
+  XCircle,
   Loader2,
-  Trash2,
-  UserCheck,
+  UserPlus,
+  Briefcase,
+  DollarSign,
 } from 'lucide-react';
 import { useTenants } from '@/hooks';
 import { TenantInsert } from '@/lib/database.types';
 
-export default function TenantsPage() {
-  const { tenants, isLoading, createTenant, deleteTenant, stats } = useTenants('active');
+export default function ApplyingTenantsPage() {
+  const { tenants, isLoading, createTenant, approveTenant, rejectTenant, stats } = useTenants('applying');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [error, setError] = useState('');
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -32,11 +36,10 @@ export default function TenantsPage() {
     last_name: '',
     email: '',
     phone: '',
-    emergency_contact_name: '',
-    emergency_contact_phone: '',
     employer_name: '',
     job_title: '',
     monthly_income: '',
+    notes: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,12 +52,12 @@ export default function TenantsPage() {
       last_name: formData.last_name,
       email: formData.email || null,
       phone: formData.phone,
-      emergency_contact_name: formData.emergency_contact_name || null,
-      emergency_contact_phone: formData.emergency_contact_phone || null,
       employer_name: formData.employer_name || null,
       job_title: formData.job_title || null,
       monthly_income: formData.monthly_income ? parseFloat(formData.monthly_income) : null,
-      status: 'active',
+      notes: formData.notes || null,
+      status: 'applying',
+      application_status: 'pending',
     };
 
     const { error: createError } = await createTenant(tenantData);
@@ -69,19 +72,43 @@ export default function TenantsPage() {
         last_name: '',
         email: '',
         phone: '',
-        emergency_contact_name: '',
-        emergency_contact_phone: '',
         employer_name: '',
         job_title: '',
         monthly_income: '',
+        notes: '',
       });
       setIsSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to remove this tenant?')) {
-      await deleteTenant(id);
+  const handleApprove = async (id: string) => {
+    setProcessingId(id);
+    await approveTenant(id);
+    setProcessingId(null);
+  };
+
+  const handleReject = async (id: string) => {
+    if (confirm('Are you sure you want to reject this application?')) {
+      setProcessingId(id);
+      await rejectTenant(id);
+      setProcessingId(null);
+    }
+  };
+
+  const getStatusBadge = (status: string | null) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="warning" size="sm" dot>Pending</Badge>;
+      case 'under_review':
+        return <Badge variant="primary" size="sm" dot>Under Review</Badge>;
+      case 'documents_needed':
+        return <Badge variant="error" size="sm" dot>Documents Needed</Badge>;
+      case 'approved':
+        return <Badge variant="success" size="sm" dot>Approved</Badge>;
+      case 'rejected':
+        return <Badge variant="error" size="sm" dot>Rejected</Badge>;
+      default:
+        return <Badge variant="default" size="sm" dot>Pending</Badge>;
     }
   };
 
@@ -92,10 +119,7 @@ export default function TenantsPage() {
       tenant.phone.includes(searchQuery);
 
     if (filterStatus === 'all') return matchesSearch;
-    if (filterStatus === 'active') return matchesSearch && tenant.status === 'active';
-    if (filterStatus === 'late') return matchesSearch && tenant.renting_rating < 70;
-
-    return matchesSearch;
+    return matchesSearch && tenant.application_status === filterStatus;
   });
 
   if (isLoading) {
@@ -109,12 +133,12 @@ export default function TenantsPage() {
   return (
     <>
       <Header
-        title="Current Tenants"
-        subtitle={`${stats.activeTenants} active tenants`}
+        title="Applying Tenants"
+        subtitle={`${stats.applyingTenants} pending applications`}
         actions={
           <Button onClick={() => setIsModalOpen(true)}>
             <Plus className="h-4 w-4" />
-            Add Tenant
+            Add Application
           </Button>
         }
       />
@@ -124,7 +148,7 @@ export default function TenantsPage() {
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="flex-1">
             <Input
-              placeholder="Search tenants..."
+              placeholder="Search applications..."
               leftIcon={<Search className="h-4 w-4" />}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -143,40 +167,45 @@ export default function TenantsPage() {
             className="cursor-pointer"
             onClick={() => setFilterStatus('all')}
           >
-            All Tenants
+            All Applications
           </Badge>
           <Badge
-            variant={filterStatus === 'active' ? 'primary' : 'default'}
+            variant={filterStatus === 'pending' ? 'primary' : 'default'}
             className="cursor-pointer"
-            onClick={() => setFilterStatus('active')}
+            onClick={() => setFilterStatus('pending')}
           >
-            Active
+            Pending
           </Badge>
           <Badge
-            variant={filterStatus === 'late' ? 'primary' : 'default'}
+            variant={filterStatus === 'under_review' ? 'primary' : 'default'}
             className="cursor-pointer"
-            onClick={() => setFilterStatus('late')}
+            onClick={() => setFilterStatus('under_review')}
           >
-            Low Rating
+            Under Review
+          </Badge>
+          <Badge
+            variant={filterStatus === 'documents_needed' ? 'primary' : 'default'}
+            className="cursor-pointer"
+            onClick={() => setFilterStatus('documents_needed')}
+          >
+            Documents Needed
           </Badge>
         </div>
 
-        {/* Tenants Grid */}
+        {/* Applications Grid */}
         {filteredTenants.length === 0 ? (
           <div className="text-center py-12">
-            <UserCheck className="h-16 w-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+            <UserPlus className="h-16 w-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-              No tenants found
+              No applications found
             </h3>
             <p className="text-gray-500 dark:text-gray-400 mb-4">
-              {searchQuery ? 'Try a different search' : 'Add your first tenant to get started'}
+              {searchQuery ? 'Try a different search' : 'No pending applications at the moment'}
             </p>
-            {!searchQuery && (
-              <Button onClick={() => setIsModalOpen(true)}>
-                <Plus className="h-4 w-4" />
-                Add Tenant
-              </Button>
-            )}
+            <Button onClick={() => setIsModalOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Add Application
+            </Button>
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -189,32 +218,12 @@ export default function TenantsPage() {
                       <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                         {tenant.first_name} {tenant.last_name}
                       </h3>
-                      <Badge
-                        variant={tenant.status === 'active' ? 'success' : 'error'}
-                        size="sm"
-                        dot
-                      >
-                        {tenant.status === 'active' ? 'Active' : tenant.status}
-                      </Badge>
+                      {getStatusBadge(tenant.application_status)}
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDelete(tenant.id)}
-                    className="p-1 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4 text-red-400 hover:text-red-500" />
-                  </button>
                 </div>
 
                 <div className="space-y-2 text-sm">
-                  {tenant.currentLease && (
-                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                      <MapPin className="h-4 w-4 text-gray-400" />
-                      <span>
-                        {tenant.currentLease.unit.property.name} - {tenant.currentLease.unit.name}
-                      </span>
-                    </div>
-                  )}
                   {tenant.email && (
                     <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                       <Mail className="h-4 w-4 text-gray-400" />
@@ -225,21 +234,25 @@ export default function TenantsPage() {
                     <Phone className="h-4 w-4 text-gray-400" />
                     <span>{tenant.phone}</span>
                   </div>
+                  {tenant.employer_name && (
+                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                      <Briefcase className="h-4 w-4 text-gray-400" />
+                      <span>{tenant.employer_name}</span>
+                    </div>
+                  )}
+                  {tenant.monthly_income && (
+                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                      <DollarSign className="h-4 w-4 text-gray-400" />
+                      <span>₱{tenant.monthly_income.toLocaleString()}/month</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                     <Calendar className="h-4 w-4 text-gray-400" />
-                    <span>Since {new Date(tenant.created_at).toLocaleDateString()}</span>
+                    <span>Applied {new Date(tenant.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Monthly Rent</p>
-                    <p className="font-semibold text-blue-600 dark:text-blue-400">
-                      {tenant.currentLease
-                        ? `₱${tenant.currentLease.monthly_rent.toLocaleString()}`
-                        : 'N/A'}
-                    </p>
-                  </div>
                   <div className="text-right">
                     <p className="text-xs text-gray-500 dark:text-gray-400">Renting Rating</p>
                     <p
@@ -255,18 +268,48 @@ export default function TenantsPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 mt-4">
+                  <Button variant="outline" size="sm" className="flex-1">
+                    <FileText className="h-4 w-4" />
+                    View Details
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/30"
+                    onClick={() => handleApprove(tenant.id)}
+                    disabled={processingId === tenant.id}
+                  >
+                    {processingId === tenant.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30"
+                    onClick={() => handleReject(tenant.id)}
+                    disabled={processingId === tenant.id}
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </Button>
+                </div>
               </Card>
             ))}
           </div>
         )}
       </div>
 
-      {/* Add Tenant Modal */}
+      {/* Add Application Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Add New Tenant"
-        description="Enter the tenant's information"
+        title="Add New Application"
+        description="Enter the applicant's information"
         size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -311,30 +354,6 @@ export default function TenantsPage() {
 
           <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
             <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3">
-              Emergency Contact
-            </h4>
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Contact Name"
-                placeholder="Maria Cruz"
-                value={formData.emergency_contact_name}
-                onChange={(e) =>
-                  setFormData({ ...formData, emergency_contact_name: e.target.value })
-                }
-              />
-              <Input
-                label="Contact Phone"
-                placeholder="+63 918 234 5678"
-                value={formData.emergency_contact_phone}
-                onChange={(e) =>
-                  setFormData({ ...formData, emergency_contact_phone: e.target.value })
-                }
-              />
-            </div>
-          </div>
-
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
-            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3">
               Employment Information
             </h4>
             <div className="grid grid-cols-2 gap-4">
@@ -362,6 +381,14 @@ export default function TenantsPage() {
             </div>
           </div>
 
+          <Textarea
+            label="Notes"
+            placeholder="Additional notes about the applicant..."
+            rows={3}
+            value={formData.notes}
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+          />
+
           <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
             <Button
               type="button"
@@ -380,7 +407,7 @@ export default function TenantsPage() {
               ) : (
                 <>
                   <Plus className="h-4 w-4" />
-                  Add Tenant
+                  Add Application
                 </>
               )}
             </Button>

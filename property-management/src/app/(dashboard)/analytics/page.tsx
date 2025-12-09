@@ -15,77 +15,103 @@ import {
   Building2,
   Users,
   CreditCard,
-  Eye,
   Crown,
   Calendar,
   ArrowUpRight,
   ArrowDownRight,
+  Loader2,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-
-const overviewStats = [
-  {
-    title: "Total Revenue",
-    value: formatCurrency(5820000),
-    icon: <CreditCard className="h-5 w-5" />,
-    trend: { value: 23.5, label: "this year" },
-    variant: "gradient" as const,
-  },
-  {
-    title: "Occupancy Rate",
-    value: "87.5%",
-    icon: <Building2 className="h-5 w-5" />,
-    trend: { value: 5.2, label: "vs last quarter" },
-  },
-  {
-    title: "Active Tenants",
-    value: "42",
-    icon: <Users className="h-5 w-5" />,
-    trend: { value: 12.1, label: "vs last year" },
-  },
-  {
-    title: "Property Views",
-    value: "2,847",
-    icon: <Eye className="h-5 w-5" />,
-    trend: { value: 18.3, label: "this month" },
-  },
-];
-
-const monthlyRevenue = [
-  { month: "Jan", revenue: 420000, expenses: 85000 },
-  { month: "Feb", revenue: 435000, expenses: 92000 },
-  { month: "Mar", revenue: 448000, expenses: 78000 },
-  { month: "Apr", revenue: 462000, expenses: 88000 },
-  { month: "May", revenue: 475000, expenses: 95000 },
-  { month: "Jun", revenue: 485000, expenses: 82000 },
-  { month: "Jul", revenue: 498000, expenses: 90000 },
-  { month: "Aug", revenue: 512000, expenses: 86000 },
-  { month: "Sep", revenue: 520000, expenses: 94000 },
-  { month: "Oct", revenue: 535000, expenses: 88000 },
-  { month: "Nov", revenue: 548000, expenses: 92000 },
-  { month: "Dec", revenue: 485000, expenses: 85000 },
-];
-
-const propertyPerformance = [
-  { name: "Sunrise Apartments", occupancy: 94, revenue: 2940000, trend: 12.5 },
-  {
-    name: "Green Valley Residences",
-    occupancy: 83,
-    revenue: 1872000,
-    trend: 8.2,
-  },
-  { name: "Metro Heights", occupancy: 75, revenue: 1008000, trend: -3.1 },
-];
-
-const topMetrics = [
-  { label: "Average Rent", value: formatCurrency(14500), change: "+8%" },
-  { label: "Vacancy Rate", value: "12.5%", change: "-3%" },
-  { label: "Avg. Days to Lease", value: "18 days", change: "-5 days" },
-  { label: "Renewal Rate", value: "78%", change: "+12%" },
-];
+import { useProperties } from "@/hooks/useProperties";
+import { useTenants } from "@/hooks/useTenants";
+import { useInvoices } from "@/hooks/useBilling";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AnalyticsPage() {
-  const maxRevenue = Math.max(...monthlyRevenue.map((m) => m.revenue));
+  const { isPremium } = useAuth();
+  const { properties, stats: propertyStats, isLoading: propertiesLoading } = useProperties();
+  const { stats: tenantStats, isLoading: tenantsLoading } = useTenants();
+  const { stats: invoiceStats, isLoading: invoicesLoading } = useInvoices();
+
+  const isLoading = propertiesLoading || tenantsLoading || invoicesLoading;
+
+  // Calculate real stats
+  const overviewStats = [
+    {
+      title: "Total Revenue",
+      value: formatCurrency(invoiceStats?.collectedAmount || 0),
+      icon: <CreditCard className="h-5 w-5" />,
+      trend: { value: 0, label: "collected" },
+      variant: "gradient" as const,
+    },
+    {
+      title: "Occupancy Rate",
+      value: `${Math.round(propertyStats?.overallOccupancy || 0)}%`,
+      icon: <Building2 className="h-5 w-5" />,
+      trend: { value: propertyStats?.totalOccupied || 0, label: "occupied units" },
+    },
+    {
+      title: "Active Tenants",
+      value: tenantStats?.activeTenants?.toString() || "0",
+      icon: <Users className="h-5 w-5" />,
+      trend: { value: tenantStats?.applyingTenants || 0, label: "applying" },
+    },
+    {
+      title: "Total Properties",
+      value: propertyStats?.totalProperties?.toString() || "0",
+      icon: <Building2 className="h-5 w-5" />,
+      trend: { value: propertyStats?.totalUnits || 0, label: "total units" },
+    },
+  ];
+
+  // Use real property data for performance
+  const propertyPerformance = properties.slice(0, 3).map((property) => ({
+    name: property.name,
+    occupancy: Math.round(property.occupancyRate),
+    revenue: property.monthlyRevenue * 12,
+    trend: 0,
+  }));
+
+  // Calculate real metrics
+  const avgRent = propertyStats?.totalUnits > 0
+    ? propertyStats.totalRevenue / propertyStats.totalOccupied
+    : 0;
+  const vacancyRate = propertyStats?.totalUnits > 0
+    ? ((propertyStats.totalUnits - propertyStats.totalOccupied) / propertyStats.totalUnits) * 100
+    : 0;
+
+  const topMetrics = [
+    { label: "Average Rent", value: formatCurrency(avgRent || 0), change: "per unit" },
+    { label: "Vacancy Rate", value: `${vacancyRate.toFixed(1)}%`, change: `${propertyStats?.totalUnits - propertyStats?.totalOccupied} vacant` },
+    { label: "Total Units", value: propertyStats?.totalUnits?.toString() || "0", change: "units" },
+    { label: "Pending Amount", value: formatCurrency(invoiceStats?.pendingAmount || 0), change: "to collect" },
+  ];
+
+  // Mock monthly data (would need actual data from DB)
+  const monthlyRevenue = [
+    { month: "Jan", revenue: 0, expenses: 0 },
+    { month: "Feb", revenue: 0, expenses: 0 },
+    { month: "Mar", revenue: 0, expenses: 0 },
+    { month: "Apr", revenue: 0, expenses: 0 },
+    { month: "May", revenue: 0, expenses: 0 },
+    { month: "Jun", revenue: 0, expenses: 0 },
+    { month: "Jul", revenue: 0, expenses: 0 },
+    { month: "Aug", revenue: 0, expenses: 0 },
+    { month: "Sep", revenue: 0, expenses: 0 },
+    { month: "Oct", revenue: 0, expenses: 0 },
+    { month: "Nov", revenue: 0, expenses: 0 },
+    { month: "Dec", revenue: invoiceStats?.collectedAmount || 0, expenses: 0 },
+  ];
+
+  const maxRevenue = Math.max(...monthlyRevenue.map((m) => m.revenue), 1);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -107,26 +133,28 @@ export default function AnalyticsPage() {
       />
 
       <div className="p-4 md:p-6 space-y-6">
-        {/* Premium Banner */}
-        <Card className="bg-gradient-to-r from-amber-400 to-amber-600 border-none">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-xl bg-white/20">
-                <Crown className="h-6 w-6 text-white" />
+        {/* Premium Banner - only show if not premium */}
+        {!isPremium && (
+          <Card className="bg-linear-to-r from-amber-400 to-amber-600 border-none">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-white/20">
+                  <Crown className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white">Premium Analytics</h3>
+                  <p className="text-white/90 text-sm">
+                    Unlock AI-powered insights, vacancy predictions, and detailed
+                    reports
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-white">Premium Analytics</h3>
-                <p className="text-white/90 text-sm">
-                  Unlock AI-powered insights, vacancy predictions, and detailed
-                  reports
-                </p>
-              </div>
+              <Button className="bg-white text-amber-600 hover:bg-amber-50">
+                Upgrade Now
+              </Button>
             </div>
-            <Button className="bg-white text-amber-600 hover:bg-amber-50">
-              Upgrade Now
-            </Button>
-          </div>
-        </Card>
+          </Card>
+        )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -203,61 +231,69 @@ export default function AnalyticsPage() {
               <CardTitle>Property Performance</CardTitle>
             </CardHeader>
             <CardContent className="p-4 md:p-6">
-              <div className="space-y-4">
-                {propertyPerformance.map((property, index) => (
-                  <div
-                    key={index}
-                    className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-medium text-gray-900 dark:text-gray-100">
-                        {property.name}
-                      </h4>
-                      <div className="flex items-center gap-1">
-                        {property.trend >= 0 ? (
-                          <ArrowUpRight className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <ArrowDownRight className="h-4 w-4 text-red-500" />
-                        )}
-                        <span
-                          className={`text-sm font-medium ${
-                            property.trend >= 0
-                              ? "text-green-500"
-                              : "text-red-500"
-                          }`}
-                        >
-                          {property.trend > 0 && "+"}
-                          {property.trend}%
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-6">
-                      <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Occupancy</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
-                            <div
-                              className="h-full bg-blue-500 rounded-full"
-                              style={{ width: `${property.occupancy}%` }}
-                            />
-                          </div>
-                          <span className="text-sm font-medium dark:text-gray-100">
-                            {property.occupancy}%
+              {propertyPerformance.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <Building2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No properties yet</p>
+                  <p className="text-sm mt-1">Add properties to see performance data</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {propertyPerformance.map((property, index) => (
+                    <div
+                      key={index}
+                      className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                          {property.name}
+                        </h4>
+                        <div className="flex items-center gap-1">
+                          {property.trend >= 0 ? (
+                            <ArrowUpRight className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <ArrowDownRight className="h-4 w-4 text-red-500" />
+                          )}
+                          <span
+                            className={`text-sm font-medium ${
+                              property.trend >= 0
+                                ? "text-green-500"
+                                : "text-red-500"
+                            }`}
+                          >
+                            {property.trend > 0 && "+"}
+                            {property.trend}%
                           </span>
                         </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Annual Revenue
-                        </p>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mt-1">
-                          {formatCurrency(property.revenue)}
-                        </p>
+                      <div className="flex items-center gap-6">
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Occupancy</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
+                              <div
+                                className="h-full bg-blue-500 rounded-full"
+                                style={{ width: `${property.occupancy}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium dark:text-gray-100">
+                              {property.occupancy}%
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Annual Revenue
+                          </p>
+                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mt-1">
+                            {formatCurrency(property.revenue)}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 

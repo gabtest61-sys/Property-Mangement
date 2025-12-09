@@ -14,3 +14,11 @@ export { Avatar } from './Avatar';
 export { StatCard } from './StatCard';
 
 export { EmptyState } from './EmptyState';
+
+export { Modal } from './Modal';
+
+export { Select } from './Select';
+
+export { Textarea } from './Textarea';
+
+export { PremiumGate, PremiumBadge, PremiumTeaser, LimitWarning } from './PremiumGate';

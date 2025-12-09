@@ -15,10 +15,12 @@ import {
   Sun,
   Moon,
   Monitor,
+  Loader2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/context/ThemeContext';
+import { useAuth } from '@/context/AuthContext';
 
 const settingsSections = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -28,12 +30,12 @@ const settingsSections = [
   { id: 'preferences', label: 'Preferences', icon: Palette },
 ];
 
-const notificationSettings = [
-  { id: 'email_payments', label: 'Payment notifications', description: 'Get notified when tenants make payments', enabled: true },
-  { id: 'email_messages', label: 'New messages', description: 'Receive emails for new chat messages', enabled: true },
+const defaultNotificationSettings = [
+  { id: 'email_payments', label: 'Payment notifications', description: 'Get notified when tenants make payments', enabled: false },
+  { id: 'email_messages', label: 'New messages', description: 'Receive emails for new chat messages', enabled: false },
   { id: 'email_contracts', label: 'Contract updates', description: 'Updates on contract signing and renewals', enabled: false },
-  { id: 'push_reminders', label: 'Payment reminders', description: 'Push notifications for upcoming payments', enabled: true },
-  { id: 'push_maintenance', label: 'Maintenance requests', description: 'Get notified of new maintenance requests', enabled: true },
+  { id: 'push_reminders', label: 'Payment reminders', description: 'Push notifications for upcoming payments', enabled: false },
+  { id: 'push_maintenance', label: 'Maintenance requests', description: 'Get notified of new maintenance requests', enabled: false },
 ];
 
 const themeOptions = [
@@ -42,17 +44,84 @@ const themeOptions = [
   { id: 'system', label: 'System', icon: Monitor, description: 'Follow system settings' },
 ] as const;
 
+// Helper function to load notification preferences from localStorage
+function getInitialNotifications() {
+  if (typeof window === 'undefined') return defaultNotificationSettings;
+
+  try {
+    const savedNotifications = localStorage.getItem('notificationPreferences');
+    if (savedNotifications) {
+      const parsed = JSON.parse(savedNotifications);
+      return defaultNotificationSettings.map(n => ({
+        ...n,
+        enabled: parsed[n.id] ?? n.enabled
+      }));
+    }
+  } catch {
+    // Use defaults if parsing fails
+  }
+  return defaultNotificationSettings;
+}
+
 export default function SettingsPage() {
+  const { profile, updateProfile, isLoading: authLoading } = useAuth();
   const [activeSection, setActiveSection] = useState('profile');
-  const [notifications, setNotifications] = useState(notificationSettings);
+  const [notifications, setNotifications] = useState(getInitialNotifications);
   const { theme, setTheme } = useTheme();
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Form state for profile
+  const [formData, setFormData] = useState({
+    full_name: '',
+    phone: '',
+    business_name: '',
+    business_address: '',
+    tax_id: '',
+  });
+  const [formInitialized, setFormInitialized] = useState(false);
+
+  // Initialize form data when profile loads
+  if (profile && !formInitialized) {
+    const nameParts = profile.full_name?.split(' ') || ['', ''];
+    setFormData({
+      full_name: profile.full_name || '',
+      phone: profile.phone || '',
+      business_name: profile.business_name || '',
+      business_address: profile.business_address || '',
+      tax_id: profile.tax_id || '',
+    });
+    setFormInitialized(true);
+  }
+
+  const handleSaveProfile = async () => {
+    setIsSaving(true);
+    await updateProfile({
+      full_name: formData.full_name,
+      phone: formData.phone,
+    });
+    setIsSaving(false);
+  };
+
+  const handleSaveBusiness = async () => {
+    setIsSaving(true);
+    await updateProfile({
+      business_name: formData.business_name,
+      business_address: formData.business_address,
+      tax_id: formData.tax_id,
+    });
+    setIsSaving(false);
+  };
 
   const toggleNotification = (id: string) => {
-    setNotifications(
-      notifications.map((n) =>
-        n.id === id ? { ...n, enabled: !n.enabled } : n
-      )
+    const updated = notifications.map((n) =>
+      n.id === id ? { ...n, enabled: !n.enabled } : n
     );
+    setNotifications(updated);
+
+    // Save to localStorage
+    const prefs: Record<string, boolean> = {};
+    updated.forEach(n => { prefs[n.id] = n.enabled; });
+    localStorage.setItem('notificationPreferences', JSON.stringify(prefs));
   };
 
   return (
@@ -100,22 +169,38 @@ export default function SettingsPage() {
                   <CardContent>
                     <div className="flex flex-col sm:flex-row items-start gap-6 mb-6">
                       <div className="relative">
-                        <Avatar name="John Doe" size="xl" />
+                        <Avatar name={profile?.full_name || 'User'} size="xl" />
                         <button className="absolute bottom-0 right-0 p-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors">
                           <Palette className="h-3.5 w-3.5" />
                         </button>
                       </div>
                       <div className="flex-1 space-y-4 w-full">
-                        <div className="grid sm:grid-cols-2 gap-4">
-                          <Input label="First Name" defaultValue="John" />
-                          <Input label="Last Name" defaultValue="Doe" />
-                        </div>
-                        <Input label="Email" type="email" defaultValue="john.doe@example.com" />
-                        <Input label="Phone Number" type="tel" defaultValue="+63 917 123 4567" />
+                        <Input
+                          label="Full Name"
+                          value={formData.full_name}
+                          onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                        />
+                        <Input
+                          label="Email"
+                          type="email"
+                          value={profile?.email || ''}
+                          disabled
+                          className="bg-gray-50 dark:bg-gray-800"
+                        />
+                        <Input
+                          label="Phone Number"
+                          type="tel"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          placeholder="+63 917 123 4567"
+                        />
                       </div>
                     </div>
                     <div className="flex justify-end">
-                      <Button>Save Changes</Button>
+                      <Button onClick={handleSaveProfile} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        Save Changes
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -126,15 +211,30 @@ export default function SettingsPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      <Input label="Business Name" defaultValue="Doe Properties" />
-                      <Input label="Business Address" defaultValue="123 Makati Ave, Makati City" />
-                      <div className="grid sm:grid-cols-2 gap-4">
-                        <Input label="Tax ID / TIN" defaultValue="123-456-789-000" />
-                        <Input label="Business Type" defaultValue="Sole Proprietor" />
-                      </div>
+                      <Input
+                        label="Business Name"
+                        value={formData.business_name}
+                        onChange={(e) => setFormData({ ...formData, business_name: e.target.value })}
+                        placeholder="Your Business Name"
+                      />
+                      <Input
+                        label="Business Address"
+                        value={formData.business_address}
+                        onChange={(e) => setFormData({ ...formData, business_address: e.target.value })}
+                        placeholder="123 Street, City"
+                      />
+                      <Input
+                        label="Tax ID / TIN"
+                        value={formData.tax_id}
+                        onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
+                        placeholder="123-456-789-000"
+                      />
                     </div>
                     <div className="flex justify-end mt-6">
-                      <Button>Save Changes</Button>
+                      <Button onClick={handleSaveBusiness} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        Save Changes
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -231,37 +331,39 @@ export default function SettingsPage() {
             {/* Billing Section */}
             {activeSection === 'billing' && (
               <>
-                <Card className="bg-gradient-to-r from-amber-400 to-amber-600 border-none text-white">
-                  <CardContent>
-                    <div className="flex items-center gap-3 mb-4">
-                      <Crown className="h-8 w-8" />
-                      <div>
-                        <h3 className="text-xl font-bold">Upgrade to Premium</h3>
-                        <p className="text-white/90">
-                          Unlock all features and remove limits
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid sm:grid-cols-2 gap-4 mb-6">
-                      {[
-                        'Unlimited properties & units',
-                        'Contract creation & e-signing',
-                        'Automated billing & reminders',
-                        'Advanced analytics & reports',
-                        'Priority support',
-                        'No advertisements',
-                      ].map((feature, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <Check className="h-4 w-4" />
-                          <span className="text-sm">{feature}</span>
+                {!profile?.is_premium && (
+                  <Card className="bg-linear-to-r from-amber-400 to-amber-600 border-none text-white">
+                    <CardContent>
+                      <div className="flex items-center gap-3 mb-4">
+                        <Crown className="h-8 w-8" />
+                        <div>
+                          <h3 className="text-xl font-bold">Upgrade to Premium</h3>
+                          <p className="text-white/90">
+                            Unlock all features and remove limits
+                          </p>
                         </div>
-                      ))}
-                    </div>
-                    <Button className="bg-white text-amber-600 hover:bg-amber-50">
-                      View Plans
-                    </Button>
-                  </CardContent>
-                </Card>
+                      </div>
+                      <div className="grid sm:grid-cols-2 gap-4 mb-6">
+                        {[
+                          'Unlimited properties & units',
+                          'Contract creation & e-signing',
+                          'Automated billing & reminders',
+                          'Advanced analytics & reports',
+                          'Priority support',
+                          'No advertisements',
+                        ].map((feature, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <Check className="h-4 w-4" />
+                            <span className="text-sm">{feature}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <Button className="bg-white text-amber-600 hover:bg-amber-50">
+                        View Plans
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
 
                 <Card>
                   <CardHeader>
@@ -271,14 +373,18 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-gray-800">
                       <div>
                         <div className="flex items-center gap-2">
-                          <h4 className="font-semibold text-gray-900 dark:text-gray-100">Free Plan</h4>
-                          <Badge variant="default">Current</Badge>
+                          <h4 className="font-semibold text-gray-900 dark:text-gray-100">
+                            {profile?.is_premium ? 'Premium Plan' : 'Free Plan'}
+                          </h4>
+                          <Badge variant={profile?.is_premium ? 'success' : 'default'}>Current</Badge>
                         </div>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                          Limited to 3 properties and 10 units
+                          {profile?.is_premium
+                            ? `Premium until ${profile.premium_expires_at ? new Date(profile.premium_expires_at).toLocaleDateString() : 'Forever'}`
+                            : 'Limited to 3 properties and 10 units'}
                         </p>
                       </div>
-                      <Button variant="primary">Upgrade</Button>
+                      {!profile?.is_premium && <Button variant="primary">Upgrade</Button>}
                     </div>
                   </CardContent>
                 </Card>
