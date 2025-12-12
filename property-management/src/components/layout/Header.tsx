@@ -3,13 +3,24 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Avatar, Badge, Button } from '@/components/ui';
+import { useTheme } from '@/context/ThemeContext';
 import {
   Search,
   Bell,
   Plus,
   ChevronDown,
   X,
+  Sun,
+  Moon,
+  Monitor,
+  Check,
 } from 'lucide-react';
+
+const themeOptions = [
+  { id: 'light', label: 'Light', icon: Sun },
+  { id: 'dark', label: 'Dark', icon: Moon },
+  { id: 'system', label: 'System', icon: Monitor },
+] as const;
 
 interface HeaderProps {
   title: string;
@@ -21,6 +32,11 @@ interface HeaderProps {
 export function Header({ title, subtitle, showSearch = true, actions }: HeaderProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
+  const { theme, setTheme, resolvedTheme } = useTheme();
+
+  // Get the current theme icon
+  const CurrentThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor;
 
   const notifications = [
     {
@@ -98,10 +114,65 @@ export function Header({ title, subtitle, showSearch = true, actions }: HeaderPr
             </div>
           )}
 
+          {/* Theme Selector */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setThemeOpen(!themeOpen);
+                setNotificationsOpen(false);
+              }}
+              className="p-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              title="Change theme"
+            >
+              <CurrentThemeIcon className="h-5 w-5" />
+            </button>
+
+            {themeOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setThemeOpen(false)}
+                />
+                <div className="absolute right-0 top-12 z-50 w-44 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 animate-scale-in overflow-hidden">
+                  <div className="p-2">
+                    {themeOptions.map((option) => {
+                      const Icon = option.icon;
+                      const isSelected = theme === option.id;
+                      return (
+                        <button
+                          key={option.id}
+                          onClick={() => {
+                            setTheme(option.id);
+                            setThemeOpen(false);
+                          }}
+                          className={cn(
+                            'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors',
+                            isSelected
+                              ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span className="font-medium text-sm">{option.label}</span>
+                          {isSelected && (
+                            <Check className="h-4 w-4 ml-auto" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Notifications */}
           <div className="relative">
             <button
-              onClick={() => setNotificationsOpen(!notificationsOpen)}
+              onClick={() => {
+                setNotificationsOpen(!notificationsOpen);
+                setThemeOpen(false);
+              }}
               className="relative p-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             >
               <Bell className="h-5 w-5" />

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { redirect, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { Button, Card, Input } from '@/components/ui';
@@ -9,7 +9,7 @@ import { Building2, Mail, Lock, Eye, EyeOff, User, CheckCircle } from 'lucide-re
 
 export default function SignUpPage() {
   const router = useRouter();
-  const { signUp } = useAuth();
+  const { signUp, user, isLoading: authLoading } = useAuth();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -19,6 +19,11 @@ export default function SignUpPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  // Redirect logged-in users to dashboard
+  if (!authLoading && user) {
+    redirect('/dashboard');
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

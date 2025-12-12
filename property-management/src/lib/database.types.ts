@@ -21,6 +21,7 @@ export interface Database {
           tax_id: string | null
           is_premium: boolean
           premium_expires_at: string | null
+          is_admin: boolean
           created_at: string
           updated_at: string
         }
@@ -35,6 +36,7 @@ export interface Database {
           tax_id?: string | null
           is_premium?: boolean
           premium_expires_at?: string | null
+          is_admin?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -49,6 +51,7 @@ export interface Database {
           tax_id?: string | null
           is_premium?: boolean
           premium_expires_at?: string | null
+          is_admin?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -683,6 +686,18 @@ export interface Database {
           created_at?: string
         }
       }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
     }
   }
 }

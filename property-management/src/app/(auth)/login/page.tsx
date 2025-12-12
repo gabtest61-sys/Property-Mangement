@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, Suspense } from 'react';
+import { redirect, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { Button, Card, Input } from '@/components/ui';
 import { Building2, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { signIn, user, isLoading: authLoading } = useAuth();
 
@@ -21,13 +20,12 @@ function LoginForm() {
   // Get the return URL from query params
   const returnUrl = searchParams.get('returnUrl');
 
-  // If already logged in, redirect to dashboard or return URL
-  useEffect(() => {
-    if (!authLoading && user) {
-      const destination = returnUrl ? decodeURIComponent(returnUrl) : '/dashboard';
-      router.replace(destination);
-    }
-  }, [user, authLoading, router, returnUrl]);
+  // If already logged in, redirect to dashboard or return URL (handled by auth layout)
+  // This is a safety check in case the layout redirect doesn't trigger
+  if (!authLoading && user) {
+    const destination = returnUrl ? decodeURIComponent(returnUrl) : '/dashboard';
+    redirect(destination);
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,11 +37,8 @@ function LoginForm() {
     if (signInError) {
       setError(signInError.message);
       setIsLoading(false);
-    } else {
-      // Redirect to return URL or dashboard
-      const destination = returnUrl ? decodeURIComponent(returnUrl) : '/dashboard';
-      router.push(destination);
     }
+    // On success, the auth state change will trigger redirect via the layout
   };
 
   return (

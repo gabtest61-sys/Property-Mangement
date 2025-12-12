@@ -11,6 +11,7 @@ interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   isPremium: boolean;
+  isAdmin: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -29,18 +30,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = getSupabaseClient();
 
   const fetchProfile = useCallback(async (userId: string) => {
-    const { data, error } = await supabase
+    console.log('Fetching profile for userId:', userId);
+
+    const { data, error } = await (supabase as any)
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
 
     if (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Error fetching profile - Code:', error.code);
+      console.error('Error fetching profile - Message:', error.message);
+      console.error('Error fetching profile - Details:', error.details);
+      console.error('Error fetching profile - Hint:', error.hint);
       return null;
     }
 
-    return data;
+    console.log('Profile fetched successfully:', data?.email);
+    return data as Profile;
   }, [supabase]);
 
   const refreshProfile = useCallback(async () => {
@@ -164,6 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 };
 
   const isPremium = profile?.is_premium ?? false;
+  const isAdmin = profile?.is_admin ?? false;
 
   return (
     <AuthContext.Provider
@@ -173,6 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         isLoading,
         isPremium,
+        isAdmin,
         signUp,
         signIn,
         signOut,

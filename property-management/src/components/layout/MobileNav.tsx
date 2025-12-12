@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui';
+import { useTheme } from '@/context/ThemeContext';
 import {
   Home,
   Building2,
@@ -19,7 +20,17 @@ import {
   Crown,
   Bell,
   Search,
+  Sun,
+  Moon,
+  Monitor,
+  Check,
 } from 'lucide-react';
+
+const themeOptions = [
+  { id: 'light', label: 'Light', icon: Sun },
+  { id: 'dark', label: 'Dark', icon: Moon },
+  { id: 'system', label: 'System', icon: Monitor },
+] as const;
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
@@ -34,7 +45,12 @@ const navItems = [
 
 export function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
   const pathname = usePathname();
+  const { theme, setTheme } = useTheme();
+
+  // Get the current theme icon
+  const CurrentThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor;
 
   return (
     <>
@@ -59,6 +75,53 @@ export function MobileNav() {
             <button className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
               <Search className="h-5 w-5" />
             </button>
+            {/* Theme Selector */}
+            <div className="relative">
+              <button
+                onClick={() => setThemeOpen(!themeOpen)}
+                className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <CurrentThemeIcon className="h-5 w-5" />
+              </button>
+
+              {themeOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-50"
+                    onClick={() => setThemeOpen(false)}
+                  />
+                  <div className="absolute right-0 top-10 z-50 w-40 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <div className="p-1.5">
+                      {themeOptions.map((option) => {
+                        const Icon = option.icon;
+                        const isSelected = theme === option.id;
+                        return (
+                          <button
+                            key={option.id}
+                            onClick={() => {
+                              setTheme(option.id);
+                              setThemeOpen(false);
+                            }}
+                            className={cn(
+                              'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors',
+                              isSelected
+                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                            )}
+                          >
+                            <Icon className="h-4 w-4" />
+                            <span className="font-medium text-sm">{option.label}</span>
+                            {isSelected && (
+                              <Check className="h-4 w-4 ml-auto" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             <button className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors relative">
               <Bell className="h-5 w-5" />
               <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full" />
